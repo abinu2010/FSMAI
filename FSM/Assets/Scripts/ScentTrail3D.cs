@@ -143,21 +143,18 @@ public class ScentTrail3D : MonoBehaviour
 
         if (strength >= sprintStrength * 0.9f)
         {
-            // Sprinting - strong but fades a bit faster
-            decay = 0.04f;   // ~50 seconds for strength 2.0
-            lifetime = 60f;
+            decay = 0.08f;
+            lifetime = 30f;
         }
         else if (strength <= crouchStrength * 1.1f)
         {
-            // Crouching - weak but fades very slowly
-            decay = 0.01f;   // ~20 seconds for strength 0.2
-            lifetime = 30f;
+            decay = 0.04f;
+            lifetime = 20f;
         }
         else
         {
-            // Walking - normal
-            decay = 0.025f;  // ~40 seconds for strength 1.0
-            lifetime = 60f;
+            decay = 0.06f;
+            lifetime = 30f;
         }
 
         // Use Initialize to properly set values BEFORE Update runs

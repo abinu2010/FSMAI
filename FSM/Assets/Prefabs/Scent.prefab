@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   strength: 1
-  decayRate: 0.025
-  maxLifetime: 60
+  decayRate: 0.08
+  maxLifetime: 20
   showDebugSphere: 1
   debugColor: {r: 0.2, g: 1, b: 0.2, a: 0.4}
