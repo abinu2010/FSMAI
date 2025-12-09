@@ -5,7 +5,7 @@ public class SoundBus3D : MonoBehaviour
     public static SoundBus3D Instance { get; private set; }
 
     public delegate void SoundEventHandler(Vector3 position, float radius, float intensity, GameObject source);
-    public event SoundEventHandler OnSoundEmitted;
+    public event SoundEventHandler OnSoundHeard;
 
     void Awake()
     {
@@ -21,11 +21,12 @@ public class SoundBus3D : MonoBehaviour
 
     public void EmitSound(Vector3 position, float radius, float intensity, GameObject source)
     {
-        Debug.Log("[SoundBus3D] Sound at " + position + " radius=" + radius + " intensity=" + intensity);
-        var handler = OnSoundEmitted;
-        if (handler != null)
+        string sourceName = source != null ? source.name : "null";
+        Debug.Log("[SoundBus3D] Sound at " + position + " radius=" + radius + " intensity=" + intensity + " from=" + sourceName);
+
+        if (OnSoundHeard != null)
         {
-            handler(position, radius, intensity, source);
+            OnSoundHeard(position, radius, intensity, source);
         }
     }
 }

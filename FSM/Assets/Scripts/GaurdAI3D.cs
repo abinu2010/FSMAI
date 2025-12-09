@@ -16,83 +16,69 @@ public enum Guard3DState
 [RequireComponent(typeof(NavMeshAgent))]
 public class GuardAI3D : MonoBehaviour
 {
-    [Header("Vision")]
+    [Header("References")]
     public Transform eyes;
-    public float sightRange = 12f;
-    public float sightAngle = 90f;
-    public LayerMask visionObstacles;
-
-    [Header("Combat")]
-    public float chaseRange = 16f;
-    public float attackRange = 2f;
-    public float attackCooldown = 1.2f;
-    public float attackDamage = 10f;
-
-    [Header("Patrol")]
     public Transform[] patrolPoints;
-    public float patrolWaitTime = 2f;
-
-    [Header("Investigation")]
-    public float suspicionDuration = 4f;
-    public float searchDuration = 8f;
-    public float searchRadius = 5f;
-
-    [Header("Smell Detection")]
-    public float smellCheckRadius = 6f;
-    public float smellSuspicionThreshold = 0.5f;
-    public float smellAlertThreshold = 1.2f;
-    public float smellCheckInterval = 0.5f;
-
-    [Header("Sound Analysis")]
-    public float baitSoundConfidence = 0.3f;
-    public float playerSoundConfidence = 1.0f;
-
-    [Header("UI")]
     public GuardStateBillboard3D stateBillboard;
+
+    [Header("Vision")]
+    public float sightRange = 18f;
+    public float sightAngle = 110f;
+    public float visionCloseRange = 2f;
+    public bool debugVision = true;
+
+    [Header("Hearing")]
+    public float baseSoundSuspicion = 0.4f;
+    public float playerSoundMultiplier = 1.3f;
+    public float baitSoundMultiplier = 1.0f;
+    public float maxSoundSuspicionPerEvent = 1.5f;
+
+    [Header("Smell")]
+    public float smellCheckInterval = 0.5f;
+    public float smellCheckRadius = 6f;
+    public float smellSuspicionThreshold = 0.25f;
+    public float smellAlertThreshold = 0.8f;
+    public float smellSuspicionMultiplier = 1.0f;
+    public bool debugSmell = false;
+
+    [Header("Suspicion and search")]
+    public float suspicionDecayRate = 0.25f;
+    public float suspiciousTime = 4f;
+    public float searchDuration = 6f;
+    public float lostSightToSearchTime = 2f;
+
+    [Header("Chase and attack")]
+    public float attackRange = 2f;
+    public float attackInterval = 1.2f;
+    public float assistRadius = 20f;
+
+    [Header("Movement")]
+    public float patrolWaitTime = 1f;
 
     NavMeshAgent agent;
     Transform player;
-    Guard3DState currentState;
-    int patrolIndex;
+
+    Guard3DState currentState = Guard3DState.Patrol;
     float stateTimer;
-    float attackTimer;
     float smellCheckTimer;
+    float attackTimer;
+    float currentSuspicion;
+
+    int patrolIndex;
     Vector3 investigateTarget;
+    bool hasInvestigateTarget;
     Vector3 lastKnownPlayerPos;
-    Vector3 searchStartPos;
-    int searchPointIndex;
-    float currentSuspicionLevel;
     bool hasDirectEvidence;
+
+    public Guard3DState CurrentState
+    {
+        get { return currentState; }
+    }
 
     void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
-    }
-
-    void OnEnable()
-    {
-        if (SoundBus3D.Instance != null)
-        {
-            SoundBus3D.Instance.OnSoundEmitted += OnSoundHeard;
-        }
-
-        if (AlertBus3D.Instance != null)
-        {
-            AlertBus3D.Instance.OnAlertRaised += OnAlertReceived;
-        }
-    }
-
-    void OnDisable()
-    {
-        if (SoundBus3D.Instance != null)
-        {
-            SoundBus3D.Instance.OnSoundEmitted -= OnSoundHeard;
-        }
-
-        if (AlertBus3D.Instance != null)
-        {
-            AlertBus3D.Instance.OnAlertRaised -= OnAlertReceived;
-        }
+        Debug.Log("[GuardAI3D] Guard Awake on " + name);
     }
 
     void Start()
@@ -102,51 +88,105 @@ public class GuardAI3D : MonoBehaviour
         {
             player = playerObj.transform;
         }
+        else
+        {
+            Debug.LogWarning("[GuardAI3D] No Player tagged object found");
+        }
+
+        if (patrolPoints != null && patrolPoints.Length > 0)
+        {
+            patrolIndex = 0;
+            GoToNextPatrolPoint();
+        }
 
         SetState(Guard3DState.Patrol);
     }
 
+    void OnEnable()
+    {
+        if (SoundBus3D.Instance != null)
+        {
+            SoundBus3D.Instance.OnSoundHeard += OnSoundHeard;
+            Debug.Log("[GuardAI3D] " + name + " subscribed to SoundBus");
+        }
+        else
+        {
+            Debug.LogWarning("[GuardAI3D] SoundBus3D.Instance is null!");
+        }
+
+        if (AlertBus3D.Instance != null)
+        {
+            AlertBus3D.Instance.OnAlertRaised += OnAlertReceived;
+            Debug.Log("[GuardAI3D] " + name + " subscribed to AlertBus");
+        }
+        else
+        {
+            Debug.LogWarning("[GuardAI3D] AlertBus3D.Instance is null!");
+        }
+    }
+
+    void OnDisable()
+    {
+        if (SoundBus3D.Instance != null)
+        {
+            SoundBus3D.Instance.OnSoundHeard -= OnSoundHeard;
+        }
+
+        if (AlertBus3D.Instance != null)
+        {
+            AlertBus3D.Instance.OnAlertRaised -= OnAlertReceived;
+        }
+    }
+
     void Update()
     {
-        attackTimer -= Time.deltaTime;
-        stateTimer += Time.deltaTime;
-        smellCheckTimer += Time.deltaTime;
+        float dt = Time.deltaTime;
+        attackTimer -= dt;
+        stateTimer += dt;
+        smellCheckTimer += dt;
 
         if (currentState == Guard3DState.Patrol || currentState == Guard3DState.Suspicious)
         {
-            currentSuspicionLevel = Mathf.Max(0, currentSuspicionLevel - Time.deltaTime * 0.2f);
+            currentSuspicion = Mathf.Max(0f, currentSuspicion - dt * suspicionDecayRate);
         }
 
-        if (CanSeePlayer())
+        if (player != null)
         {
-            float distance = Vector3.Distance(transform.position, player.position);
-            lastKnownPlayerPos = player.position;
-            hasDirectEvidence = true;
-            currentSuspicionLevel = 2f;
+            if (CanSeePlayer())
+            {
+                lastKnownPlayerPos = player.position;
+                hasDirectEvidence = true;
+                currentSuspicion = Mathf.Max(currentSuspicion, 2f);
 
-            if (distance <= attackRange)
-            {
-                SetState(Guard3DState.Attack);
+                float distance = Vector3.Distance(transform.position, player.position);
+
+                if (distance <= attackRange)
+                {
+                    SetState(Guard3DState.Attack);
+                }
+                else
+                {
+                    SetState(Guard3DState.Chase);
+                }
             }
-            else
-            {
-                SetState(Guard3DState.Chase);
-            }
+        }
+
+        if (smellCheckTimer >= smellCheckInterval)
+        {
+            smellCheckTimer = 0f;
+            CheckSmell();
         }
 
         switch (currentState)
         {
             case Guard3DState.Patrol:
                 UpdatePatrol();
-                CheckSmell();
                 break;
             case Guard3DState.Suspicious:
                 UpdateSuspicious();
-                CheckSmell();
                 break;
             case Guard3DState.InvestigateSound:
                 UpdateInvestigateSound();
-                CheckSmell();
                 break;
             case Guard3DState.InvestigateSmell:
                 UpdateInvestigateSmell();
@@ -159,90 +199,31 @@ public class GuardAI3D : MonoBehaviour
                 break;
             case Guard3DState.Search:
                 UpdateSearch();
-                CheckSmell();
                 break;
             case Guard3DState.Assist:
                 UpdateAssist();
-                CheckSmell();
-                break;
-        }
-    }
-
-    void SetState(Guard3DState newState)
-    {
-        if (currentState == newState)
-        {
-            return;
-        }
-
-        Guard3DState previousState = currentState;
-        currentState = newState;
-        stateTimer = 0f;
-
-        if (stateBillboard != null)
-        {
-            stateBillboard.SetText(newState.ToString());
-        }
-
-        UnityEngine.Debug.Log($"[GuardAI3D] {name} state {previousState} to {newState} (suspicion: {currentSuspicionLevel:F2})");
-
-        switch (newState)
-        {
-            case Guard3DState.Patrol:
-                GoNextPatrolPoint();
-                break;
-
-            case Guard3DState.Chase:
-                agent.speed *= 1.3f;
-                if (player != null)
-                {
-                    agent.isStopped = false;
-                    agent.SetDestination(player.position);
-                }
-                if (AlertBus3D.Instance != null && hasDirectEvidence)
-                {
-                    AlertBus3D.Instance.RaiseAlert(transform.position, gameObject, AlertLevel.High);
-                }
-                break;
-
-            case Guard3DState.InvestigateSound:
-            case Guard3DState.InvestigateSmell:
-                agent.isStopped = false;
-                agent.SetDestination(investigateTarget);
-                break;
-
-            case Guard3DState.Search:
-                searchStartPos = investigateTarget;
-                searchPointIndex = 0;
-                agent.isStopped = false;
-                SetNextSearchPoint();
-                break;
-
-            case Guard3DState.Assist:
-                agent.isStopped = false;
-                agent.SetDestination(investigateTarget);
-                break;
-
-            case Guard3DState.Attack:
-                agent.isStopped = false;
-                break;
-
-            case Guard3DState.Suspicious:
-                agent.isStopped = true;
                 break;
         }
     }
 
     bool CanSeePlayer()
     {
-        if (player == null)
-        {
-            return false;
-        }
+        if (player == null) return false;
 
-        Vector3 origin = eyes != null ? eyes.position : transform.position + Vector3.up * 1.8f;
-        Vector3 toPlayer = player.position - origin;
+        Vector3 origin = eyes != null ? eyes.position : transform.position + Vector3.up * 1.7f;
+        Vector3 toPlayer = (player.position + Vector3.up * 1.0f) - origin;
         float distance = toPlayer.magnitude;
+
+        if (distance < 0.01f) return false;
+
+        if (distance <= visionCloseRange)
+        {
+            if (debugVision)
+            {
+                Debug.Log("[GuardAI3D] " + name + " sees player by close range");
+            }
+            return true;
+        }
 
         if (distance > sightRange)
         {
@@ -258,59 +239,92 @@ public class GuardAI3D : MonoBehaviour
         }
 
         RaycastHit hit;
-        if (Physics.Raycast(origin, dir, out hit, sightRange, ~0, QueryTriggerInteraction.Ignore))
+        if (Physics.Raycast(origin, dir, out hit, distance + 0.5f, ~0, QueryTriggerInteraction.Ignore))
         {
-            if (hit.collider != null && hit.collider.CompareTag("Player"))
+            if (hit.collider != null)
             {
-                UnityEngine.Debug.Log($"[GuardAI3D] {name} sees player at {distance:F1}m");
-                return true;
+                if (hit.collider.CompareTag("Player"))
+                {
+                    if (debugVision)
+                    {
+                        Debug.Log("[GuardAI3D] " + name + " sees player at " + distance.ToString("F1") + " m");
+                    }
+                    return true;
+                }
             }
         }
 
         return false;
     }
 
-    void UpdatePatrol()
+    void SetState(Guard3DState newState)
     {
-        if (patrolPoints == null || patrolPoints.Length == 0)
+        if (currentState == newState) return;
+
+        Guard3DState previousState = currentState;
+        currentState = newState;
+        stateTimer = 0f;
+
+        if (stateBillboard != null)
         {
-            agent.isStopped = true;
-            return;
+            stateBillboard.SetText(newState.ToString());
         }
 
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+        Debug.Log("[GuardAI3D] " + name + " state " + previousState + " to " + newState + " suspicion " + currentSuspicion.ToString("F2"));
+
+        if (agent != null)
+        {
+            agent.isStopped = (newState == Guard3DState.Attack || newState == Guard3DState.Suspicious);
+        }
+
+        if (newState == Guard3DState.Chase && hasDirectEvidence && AlertBus3D.Instance != null)
+        {
+            AlertBus3D.Instance.RaiseAlert(lastKnownPlayerPos, AlertLevel.High, gameObject);
+        }
+        else if (newState == Guard3DState.Attack && hasDirectEvidence && AlertBus3D.Instance != null)
+        {
+            AlertBus3D.Instance.RaiseAlert(lastKnownPlayerPos, AlertLevel.Critical, gameObject);
+        }
+
+        if (newState == Guard3DState.Patrol)
+        {
+            hasInvestigateTarget = false;
+        }
+    }
+
+    void GoToNextPatrolPoint()
+    {
+        if (agent == null) return;
+        if (patrolPoints == null || patrolPoints.Length == 0) return;
+
+        agent.destination = patrolPoints[patrolIndex].position;
+        Debug.Log("[GuardAI3D] " + name + " patrol to " + agent.destination);
+
+        patrolIndex = (patrolIndex + 1) % patrolPoints.Length;
+    }
+
+    void UpdatePatrol()
+    {
+        if (agent == null) return;
+        if (patrolPoints == null || patrolPoints.Length == 0) return;
+
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.1f)
         {
             if (stateTimer >= patrolWaitTime)
             {
-                GoNextPatrolPoint();
+                GoToNextPatrolPoint();
             }
         }
     }
 
-    void GoNextPatrolPoint()
-    {
-        if (patrolPoints == null || patrolPoints.Length == 0)
-        {
-            return;
-        }
-
-        patrolIndex = (patrolIndex + 1) % patrolPoints.Length;
-        Vector3 target = patrolPoints[patrolIndex].position;
-        agent.isStopped = false;
-        agent.SetDestination(target);
-        UnityEngine.Debug.Log($"[GuardAI3D] {name} patrol to {target}");
-    }
-
     void UpdateSuspicious()
     {
-        agent.isStopped = true;
-        transform.Rotate(Vector3.up, 45f * Time.deltaTime);
+        currentSuspicion = Mathf.Max(0f, currentSuspicion - Time.deltaTime * suspicionDecayRate);
 
-        if (stateTimer >= suspicionDuration)
+        if (stateTimer >= suspiciousTime)
         {
-            if (currentSuspicionLevel > 1f)
+            if (currentSuspicion >= 1.5f)
             {
-                investigateTarget = transform.position;
                 SetState(Guard3DState.Search);
             }
             else
@@ -322,13 +336,20 @@ public class GuardAI3D : MonoBehaviour
 
     void UpdateInvestigateSound()
     {
-        agent.isStopped = false;
-
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+        if (!hasInvestigateTarget || agent == null)
         {
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} reached sound location");
+            SetState(Guard3DState.Patrol);
+            return;
+        }
 
-            if (currentSuspicionLevel > 1f)
+        agent.destination = investigateTarget;
+
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.2f)
+        {
+            Debug.Log("[GuardAI3D] " + name + " reached sound location");
+            hasInvestigateTarget = false;
+
+            if (currentSuspicion >= 1.2f)
             {
                 SetState(Guard3DState.Search);
             }
@@ -341,20 +362,21 @@ public class GuardAI3D : MonoBehaviour
 
     void UpdateInvestigateSmell()
     {
-        agent.isStopped = false;
-
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+        if (!hasInvestigateTarget || agent == null)
         {
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} reached smell source");
+            SetState(Guard3DState.Patrol);
+            return;
+        }
 
-            CheckSmellAtLocation(investigateTarget);
+        agent.destination = investigateTarget;
 
-            if (currentSuspicionLevel > 1.5f)
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.2f)
+        {
+            Debug.Log("[GuardAI3D] " + name + " reached smell location");
+            hasInvestigateTarget = false;
+
+            if (currentSuspicion >= smellAlertThreshold)
             {
-                if (AlertBus3D.Instance != null)
-                {
-                    AlertBus3D.Instance.RaiseAlert(investigateTarget, gameObject, AlertLevel.Medium);
-                }
                 SetState(Guard3DState.Search);
             }
             else
@@ -366,30 +388,27 @@ public class GuardAI3D : MonoBehaviour
 
     void UpdateChase()
     {
-        if (player == null)
+        if (player == null || agent == null)
         {
-            SetState(Guard3DState.Search);
+            SetState(Guard3DState.Patrol);
             return;
         }
 
         float distance = Vector3.Distance(transform.position, player.position);
+        agent.destination = player.position;
 
-        if (!agent.pathPending)
-        {
-            agent.isStopped = false;
-            agent.SetDestination(player.position);
-        }
-
-        if (distance > chaseRange && !CanSeePlayer())
-        {
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} lost player");
-            lastKnownPlayerPos = player.position;
-            investigateTarget = lastKnownPlayerPos;
-            SetState(Guard3DState.Search);
-        }
-        else if (distance <= attackRange)
+        if (distance <= attackRange)
         {
             SetState(Guard3DState.Attack);
+            return;
+        }
+
+        if (!CanSeePlayer())
+        {
+            if (stateTimer >= lostSightToSearchTime)
+            {
+                SetState(Guard3DState.Search);
+            }
         }
     }
 
@@ -397,128 +416,154 @@ public class GuardAI3D : MonoBehaviour
     {
         if (player == null)
         {
-            SetState(Guard3DState.Search);
+            SetState(Guard3DState.Patrol);
             return;
         }
 
+        Vector3 lookPos = new Vector3(player.position.x, transform.position.y, player.position.z);
+        transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.LookRotation(lookPos - transform.position), Time.deltaTime * 10f);
+
         float distance = Vector3.Distance(transform.position, player.position);
 
-        if (distance > attackRange * 1.5f)
+        if (distance > attackRange * 1.2f)
         {
             SetState(Guard3DState.Chase);
             return;
         }
 
-        if (distance > attackRange)
+        if (!CanSeePlayer())
         {
-            agent.isStopped = false;
-            agent.SetDestination(player.position);
-        }
-        else
-        {
-            agent.isStopped = true;
-        }
-
-        Vector3 toPlayer = player.position - transform.position;
-        toPlayer.y = 0f;
-
-        if (toPlayer.sqrMagnitude > 0.01f)
-        {
-            Quaternion targetRot = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
+            if (stateTimer >= lostSightToSearchTime)
+            {
+                SetState(Guard3DState.Search);
+            }
+            return;
         }
 
         if (attackTimer <= 0f)
         {
-            PerformAttack();
-            attackTimer = attackCooldown;
+            Debug.Log("[GuardAI3D] " + name + " attacks player");
+            attackTimer = attackInterval;
         }
-    }
-
-    void PerformAttack()
-    {
-        UnityEngine.Debug.Log($"[GuardAI3D] {name} attacks player for {attackDamage} damage!");
-
-        // TODO: Apply damage to player
-        // player.GetComponent<PlayerHealth>()?.TakeDamage(attackDamage);
     }
 
     void UpdateSearch()
     {
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+        if (agent == null)
         {
-            SetNextSearchPoint();
+            SetState(Guard3DState.Patrol);
+            return;
+        }
+
+        if (stateTimer < searchDuration * 0.5f)
+        {
+            agent.destination = lastKnownPlayerPos;
+        }
+        else
+        {
+            if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.2f)
+            {
+                SetState(Guard3DState.Patrol);
+            }
         }
 
         if (stateTimer >= searchDuration)
         {
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} search complete, returning to patrol");
             SetState(Guard3DState.Patrol);
         }
     }
 
-    void SetNextSearchPoint()
-    {
-        float angle = searchPointIndex * 90f;
-        float radius = searchRadius;
-
-        Vector3 offset = new Vector3(
-            Mathf.Cos(angle * Mathf.Deg2Rad) * radius,
-            0f,
-            Mathf.Sin(angle * Mathf.Deg2Rad) * radius
-        );
-
-        Vector3 searchPoint = searchStartPos + offset;
-
-        NavMeshHit navHit;
-        if (NavMesh.SamplePosition(searchPoint, out navHit, radius * 2f, NavMesh.AllAreas))
-        {
-            agent.SetDestination(navHit.position);
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} search point {searchPointIndex} to {navHit.position}");
-        }
-
-        searchPointIndex++;
-    }
-
     void UpdateAssist()
     {
-        agent.isStopped = false;
-
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 1f)
+        if (agent == null)
         {
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} arrived to assist");
-            investigateTarget = transform.position;
+            SetState(Guard3DState.Patrol);
+            return;
+        }
+
+        agent.destination = lastKnownPlayerPos;
+
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.2f)
+        {
             SetState(Guard3DState.Search);
+        }
+    }
+
+    void OnSoundHeard(Vector3 position, float radius, float intensity, GameObject source)
+    {
+        if (!isActiveAndEnabled) return;
+
+        float distance = Vector3.Distance(transform.position, position);
+        if (distance > radius) return;
+
+        bool fromPlayer = source != null && source.CompareTag("Player");
+        float urgency = Mathf.Clamp01((radius - distance) / radius);
+        float suspicionGain = baseSoundSuspicion * urgency * intensity;
+
+        if (fromPlayer)
+        {
+            suspicionGain *= playerSoundMultiplier;
+        }
+        else
+        {
+            suspicionGain *= baitSoundMultiplier;
+        }
+
+        suspicionGain = Mathf.Min(suspicionGain, maxSoundSuspicionPerEvent);
+        currentSuspicion += suspicionGain;
+
+        Debug.Log("[GuardAI3D] " + name + " heard sound at " + position + " dist " + distance.ToString("F1") + " urgency " + urgency.ToString("F2") + " player=" + fromPlayer + " suspicionGain " + suspicionGain.ToString("F2") + " total " + currentSuspicion.ToString("F2"));
+
+        investigateTarget = position;
+        hasInvestigateTarget = true;
+
+        if (currentState == Guard3DState.Patrol || currentState == Guard3DState.Suspicious || currentState == Guard3DState.Search)
+        {
+            SetState(Guard3DState.InvestigateSound);
+        }
+    }
+
+    void OnAlertReceived(Vector3 position, AlertLevel level, GameObject sourceGuard)
+    {
+        if (!isActiveAndEnabled) return;
+        if (sourceGuard == gameObject) return;
+
+        float dist = Vector3.Distance(transform.position, position);
+        if (dist > assistRadius) return;
+
+        string guardName = sourceGuard != null ? sourceGuard.name : "unknown";
+        Debug.Log("[GuardAI3D] " + name + " received alert " + level + " from " + guardName + " at distance " + dist.ToString("F1"));
+
+        lastKnownPlayerPos = position;
+
+        if (level == AlertLevel.High || level == AlertLevel.Critical)
+        {
+            SetState(Guard3DState.Assist);
+        }
+        else if (level == AlertLevel.Medium)
+        {
+            if (currentState == Guard3DState.Patrol)
+            {
+                SetState(Guard3DState.Suspicious);
+            }
         }
     }
 
     void CheckSmell()
     {
-        if (smellCheckTimer < smellCheckInterval)
-        {
-            return;
-        }
-        smellCheckTimer = 0f;
+        if (ScentNode3D.AllNodes == null || ScentNode3D.AllNodes.Count == 0) return;
 
-        if (ScentNode3D.AllNodes.Count == 0)
-        {
-            return;
-        }
-
-        ScentNode3D bestNode = null;
         float bestScore = 0f;
+        ScentNode3D bestNode = null;
 
-        foreach (ScentNode3D node in ScentNode3D.AllNodes)
+        foreach (var node in ScentNode3D.AllNodes)
         {
             if (node == null) continue;
 
-            float distance = Vector3.Distance(transform.position, node.transform.position);
-            if (distance > smellCheckRadius)
-            {
-                continue;
-            }
+            float dist = Vector3.Distance(transform.position, node.transform.position);
+            if (dist > smellCheckRadius) continue;
 
-            float score = node.strength / Mathf.Max(distance, 0.1f);
+            float score = node.GetStrengthAtPosition(transform.position) * smellSuspicionMultiplier;
             if (score > bestScore)
             {
                 bestScore = score;
@@ -526,138 +571,26 @@ public class GuardAI3D : MonoBehaviour
             }
         }
 
-        if (bestNode != null && bestScore >= smellSuspicionThreshold)
+        if (bestNode == null || bestScore <= 0.001f) return;
+
+        currentSuspicion += bestScore;
+
+        if (debugSmell)
+        {
+            Debug.Log("[GuardAI3D] " + name + " smell score " + bestScore.ToString("F2") + " at node " + bestNode.name + " suspicion " + currentSuspicion.ToString("F2"));
+        }
+
+        if (currentSuspicion >= smellSuspicionThreshold && (currentState == Guard3DState.Patrol || currentState == Guard3DState.Suspicious))
         {
             investigateTarget = bestNode.transform.position;
-            currentSuspicionLevel += bestScore * 0.5f;
-
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} smells something at {investigateTarget} (score: {bestScore:F2}, suspicion: {currentSuspicionLevel:F2})");
-
-            if (bestScore >= smellAlertThreshold)
-            {
-                UnityEngine.Debug.Log($"[GuardAI3D] {name} STRONG SMELL DETECTED - alerting others!");
-                if (AlertBus3D.Instance != null)
-                {
-                    AlertBus3D.Instance.RaiseAlert(investigateTarget, gameObject, AlertLevel.Medium);
-                }
-            }
-
-            if (currentState == Guard3DState.Patrol ||
-                currentState == Guard3DState.Suspicious ||
-                (currentState == Guard3DState.Search && stateTimer > 2f))
-            {
-                SetState(Guard3DState.InvestigateSmell);
-            }
-        }
-    }
-
-    void CheckSmellAtLocation(Vector3 location)
-    {
-        float strongestSmell = 0f;
-
-        foreach (ScentNode3D node in ScentNode3D.AllNodes)
-        {
-            if (node == null) continue;
-
-            float distance = Vector3.Distance(location, node.transform.position);
-            if (distance < 2f)
-            {
-                strongestSmell = Mathf.Max(strongestSmell, node.strength);
-            }
+            hasInvestigateTarget = true;
+            SetState(Guard3DState.InvestigateSmell);
         }
 
-        if (strongestSmell > 0f)
+        if (currentSuspicion >= smellAlertThreshold)
         {
-            currentSuspicionLevel += strongestSmell;
-            UnityEngine.Debug.Log($"[GuardAI3D] {name} found strong smell at location (suspicion +{strongestSmell:F2})");
-        }
-    }
-
-    void OnSoundHeard(Vector3 position, float radius, float intensity, GameObject source)
-    {
-        float distance = Vector3.Distance(transform.position, position);
-        if (distance > radius)
-        {
-            return;
-        }
-
-        float urgency = (1f - distance / radius) * intensity;
-        bool isPlayerSound = source != null && source.CompareTag("Player");
-
-        float confidence = isPlayerSound ? playerSoundConfidence : baitSoundConfidence;
-        currentSuspicionLevel += urgency * confidence;
-
-        investigateTarget = position;
-        UnityEngine.Debug.Log($"[GuardAI3D] {name} heard sound at {position} (dist: {distance:F1}, urgency: {urgency:F2}, player: {isPlayerSound})");
-
-        if (isPlayerSound)
-        {
-            lastKnownPlayerPos = position;
-        }
-
-        if (currentState == Guard3DState.Chase || currentState == Guard3DState.Attack)
-        {
-            return;
-        }
-
-        SetState(Guard3DState.InvestigateSound);
-    }
-
-    void OnAlertReceived(Vector3 position, GameObject sourceGuard, AlertLevel level)
-    {
-        if (sourceGuard == gameObject)
-        {
-            return;
-        }
-
-        investigateTarget = position;
-
-        // React more urgently to higher alert levels
-        switch (level)
-        {
-            case AlertLevel.Low:
-                currentSuspicionLevel += 0.5f;
-                break;
-            case AlertLevel.Medium:
-                currentSuspicionLevel += 1f;
-                break;
-            case AlertLevel.High:
-                currentSuspicionLevel += 2f;
-                break;
-            case AlertLevel.Critical:
-                currentSuspicionLevel += 3f;
-                hasDirectEvidence = true; // Treat as if we saw something
-                break;
-        }
-
-        Debug.Log($"[GuardAI3D] {name} received {level} alert from {sourceGuard.name}");
-
-        // Only respond if not in high-priority state
-        if (currentState != Guard3DState.Chase && currentState != Guard3DState.Attack)
-        {
-            if (level >= AlertLevel.High)
-            {
-                SetState(Guard3DState.Search); // Skip to search for high alerts
-            }
-            else
-            {
-                SetState(Guard3DState.Assist);
-            }
-        }
-    }
-    public void OnHitByPlayer(Vector3 hitPoint)
-    {
-        lastKnownPlayerPos = hitPoint;
-        investigateTarget = hitPoint;
-        hasDirectEvidence = true;
-        currentSuspicionLevel = 2f;
-
-        UnityEngine.Debug.Log($"[GuardAI3D] {name} was hit at {hitPoint}!");
-        SetState(Guard3DState.Chase);
-
-        if (AlertBus3D.Instance != null)
-        {
-            AlertBus3D.Instance.RaiseAlert(hitPoint, gameObject, AlertLevel.Critical);
+            hasDirectEvidence = true;
+            lastKnownPlayerPos = bestNode.transform.position;
         }
     }
 
