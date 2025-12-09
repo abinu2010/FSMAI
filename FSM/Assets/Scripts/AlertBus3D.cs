@@ -1,42 +1,71 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public enum AlertLevel
 {
     Low,        // Suspicious sound/smell
-    Medium,     // Found evidence
-    High,       // Player spotted
-    Critical    // Player engaged in combat
+    Medium,     // Found evidence (bait, strong smell)
+    High,       // Player spotted or strong evidence
+    Critical    // Player engaged in combat or confirmed sighting
 }
 
 public class AlertBus3D : MonoBehaviour
 {
     public static AlertBus3D Instance { get; private set; }
 
-    // Different alert types with different urgency
+    // Alert event with level
     public delegate void AlertEventHandler(Vector3 position, GameObject sourceGuard, AlertLevel level);
     public event AlertEventHandler OnAlertRaised;
 
-    // Global alert state
+    // Player position update event (for guards to track player during combat)
+    public delegate void PlayerPositionHandler(Vector3 position);
+    public event PlayerPositionHandler OnPlayerPositionUpdated;
+
+    [Header("Global Alert")]
     public AlertLevel CurrentGlobalAlert { get; private set; } = AlertLevel.Low;
-    public float globalAlertDecayRate = 0.1f; // How fast alert level decreases
+    public float globalAlertDecayRate = 0.08f; // How fast alert level decreases
+
+    [Header("Player Tracking")]
+    public Vector3 LastKnownPlayerPosition { get; private set; }
+    public float TimeSincePlayerSeen { get; private set; }
+
+    [Header("Debug")]
+    public bool showAlertGizmos = true;
+
     float globalAlertValue = 0f;
+
+    // Track recent alerts for visualization
+    private List<AlertGizmoData> recentAlerts = new List<AlertGizmoData>();
+
+    struct AlertGizmoData
+    {
+        public Vector3 position;
+        public AlertLevel level;
+        public float time;
+    }
 
     void Awake()
     {
+        // Singleton setup - MUST happen in Awake before other scripts Start
         if (Instance != null && Instance != this)
         {
+            Debug.LogWarning("[AlertBus3D] Duplicate instance destroyed");
             Destroy(gameObject);
             return;
         }
 
         Instance = this;
-        Debug.Log("[AlertBus3D] Ready");
+        DontDestroyOnLoad(gameObject);
+        Debug.Log("[AlertBus3D] Instance created and ready");
     }
 
     void Update()
     {
         // Decay global alert over time
         globalAlertValue = Mathf.Max(0f, globalAlertValue - globalAlertDecayRate * Time.deltaTime);
+
+        // Track time since player was last seen
+        TimeSincePlayerSeen += Time.deltaTime;
 
         // Update alert level based on value
         AlertLevel newLevel = AlertLevel.Low;
@@ -50,38 +79,89 @@ public class AlertBus3D : MonoBehaviour
         if (newLevel != CurrentGlobalAlert)
         {
             CurrentGlobalAlert = newLevel;
-            Debug.Log($"[AlertBus3D] Global alert level: {CurrentGlobalAlert}");
+            Debug.Log($"[AlertBus3D] Global alert changed to: {CurrentGlobalAlert} (value: {globalAlertValue:F2})");
         }
+
+        // Clean up old gizmo data
+        recentAlerts.RemoveAll(a => Time.time - a.time > 3f);
+    }
+
+    /// <summary>
+    /// Update all guards about the player's current position (called during combat)
+    /// </summary>
+    public void UpdatePlayerPosition(Vector3 position)
+    {
+        LastKnownPlayerPosition = position;
+        TimeSincePlayerSeen = 0f;
+
+        // Notify all listening guards
+        OnPlayerPositionUpdated?.Invoke(position);
     }
 
     public void RaiseAlert(Vector3 position, GameObject sourceGuard, AlertLevel level = AlertLevel.Medium)
     {
-        // Increase global alert value
+        // Update last known player position for high-level alerts
+        if (level >= AlertLevel.High)
+        {
+            LastKnownPlayerPosition = position;
+            TimeSincePlayerSeen = 0f;
+        }
+
+        // Increase global alert value based on level
+        float alertIncrease = 0f;
         switch (level)
         {
             case AlertLevel.Low:
-                globalAlertValue += 0.5f;
+                alertIncrease = 0.5f;
                 break;
             case AlertLevel.Medium:
-                globalAlertValue += 1.5f;
+                alertIncrease = 1.5f;
                 break;
             case AlertLevel.High:
-                globalAlertValue += 2.5f;
+                alertIncrease = 2.5f;
                 break;
             case AlertLevel.Critical:
-                globalAlertValue += 4f;
+                alertIncrease = 4f;
                 break;
         }
 
-        globalAlertValue = Mathf.Min(globalAlertValue, 5f); // Cap at 5
+        globalAlertValue = Mathf.Min(globalAlertValue + alertIncrease, 5f);
 
-        Debug.Log($"[AlertBus3D] Alert from {sourceGuard.name} at {position} - Level: {level} (Global: {globalAlertValue:F2})");
+        string guardName = sourceGuard != null ? sourceGuard.name : "Unknown";
+        Debug.Log($"[AlertBus3D] ALERT RAISED by {guardName} at {position} - Level: {level} (Global: {globalAlertValue:F2})");
 
+        // Store for gizmo
+        if (showAlertGizmos)
+        {
+            recentAlerts.Add(new AlertGizmoData
+            {
+                position = position,
+                level = level,
+                time = Time.time
+            });
+        }
+
+        // Fire event to all listeners
         var handler = OnAlertRaised;
         if (handler != null)
         {
+            int listenerCount = handler.GetInvocationList().Length;
+            Debug.Log($"[AlertBus3D] Notifying {listenerCount} guards of {level} alert");
             handler(position, sourceGuard, level);
         }
+        else
+        {
+            Debug.LogWarning("[AlertBus3D] No listeners subscribed to OnAlertRaised!");
+        }
+    }
+
+    /// <summary>
+    /// Check how many guards are listening
+    /// </summary>
+    public int GetListenerCount()
+    {
+        var handler = OnAlertRaised;
+        return handler != null ? handler.GetInvocationList().Length : 0;
     }
 
     /// <summary>
@@ -104,6 +184,7 @@ public class AlertBus3D : MonoBehaviour
                 globalAlertValue = 4f;
                 break;
         }
+        Debug.Log($"[AlertBus3D] Global alert manually set to {level}");
     }
 
     /// <summary>
@@ -113,53 +194,47 @@ public class AlertBus3D : MonoBehaviour
     {
         globalAlertValue = 0f;
         CurrentGlobalAlert = AlertLevel.Low;
+        TimeSincePlayerSeen = 999f;
         Debug.Log("[AlertBus3D] All alerts cleared");
     }
-}
 
-// ==================== UPDATE GuardAI3D.cs to use alert levels ====================
-// In your GuardAI3D.cs, update the OnAlertReceived method signature:
-/*
-void OnAlertReceived(Vector3 position, GameObject sourceGuard, AlertLevel level)
-{
-    if (sourceGuard == gameObject)
+    void OnDrawGizmos()
     {
-        return;
-    }
+        if (!showAlertGizmos || !Application.isPlaying) return;
 
-    investigateTarget = position;
-    
-    // React more urgently to higher alert levels
-    switch (level)
-    {
-        case AlertLevel.Low:
-            currentSuspicionLevel += 0.5f;
-            break;
-        case AlertLevel.Medium:
-            currentSuspicionLevel += 1f;
-            break;
-        case AlertLevel.High:
-            currentSuspicionLevel += 2f;
-            break;
-        case AlertLevel.Critical:
-            currentSuspicionLevel += 3f;
-            hasDirectEvidence = true; // Treat as if we saw something
-            break;
-    }
-
-    Debug.Log($"[GuardAI3D] {name} received {level} alert from {sourceGuard.name}");
-
-    // Only respond if not in high-priority state
-    if (currentState != Guard3DState.Chase && currentState != Guard3DState.Attack)
-    {
-        if (level >= AlertLevel.High)
+        foreach (var alert in recentAlerts)
         {
-            SetState(Guard3DState.Search); // Skip to search for high alerts
+            float age = Time.time - alert.time;
+            float alpha = 1f - (age / 3f);
+
+            // Color based on alert level
+            Color col = Color.white;
+            switch (alert.level)
+            {
+                case AlertLevel.Low:
+                    col = Color.yellow;
+                    break;
+                case AlertLevel.Medium:
+                    col = new Color(1f, 0.5f, 0f); // Orange
+                    break;
+                case AlertLevel.High:
+                    col = new Color(1f, 0.2f, 0f); // Red-orange
+                    break;
+                case AlertLevel.Critical:
+                    col = Color.red;
+                    break;
+            }
+
+            col.a = alpha * 0.5f;
+            Gizmos.color = col;
+            Gizmos.DrawWireSphere(alert.position, 2f + (int)alert.level);
         }
-        else
+
+        // Draw last known player position
+        if (TimeSincePlayerSeen < 10f)
         {
-            SetState(Guard3DState.Assist);
+            Gizmos.color = new Color(1f, 0f, 0f, 0.8f);
+            Gizmos.DrawWireCube(LastKnownPlayerPosition, Vector3.one * 0.5f);
         }
     }
 }
-*/

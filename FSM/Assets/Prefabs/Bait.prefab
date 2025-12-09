@@ -14,9 +14,9 @@ GameObject:
   - component: {fileID: 8903845016226064398}
   - component: {fileID: 1098676144180073472}
   - component: {fileID: -83663853185243351}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bait
-  m_TagString: Untagged
+  m_TagString: Bait
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -67,7 +67,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10756, guid: 0000000000000000e000000000000000, type: 0}
+  - {fileID: 15303, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -124,8 +124,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   soundRadius: 10
   soundIntensity: 1
+  landingSoundDelay: 0.1
   smellStrength: 1.5
-  scentNodePrefab: {fileID: 7404841032893425725, guid: 60716545d5526034e931ad870ccb98d6, type: 3}
+  scentNodePrefab: {fileID: 2633944287007259218, guid: 5a1fd0488636a124ea8917e3f08e2251, type: 3}
+  lifetime: 30
+  activationDelay: 0.2
+  groundCheckDelay: 0.5
+  showDebugRadius: 1
+  showDebugLogs: 1
 --- !u!54 &-83663853185243351
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -150,6 +156,6 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
