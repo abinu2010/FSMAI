@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Bait
   - Guard
+  - ObjectiveBall
   layers:
   - Default
   - TransparentFX

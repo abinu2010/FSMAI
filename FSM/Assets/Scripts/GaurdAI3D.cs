@@ -544,10 +544,24 @@ public class GuardAI3D : MonoBehaviour
 
     void PerformAttack()
     {
-        Log($"ATTACK! ({attackDamage} damage)");
-        // TODO: Actually damage the player
-        // player.GetComponent<PlayerHealth>()?.TakeDamage(attackDamage);
+        if (player == null)
+        {
+            return;
+        }
+
+        Log("Attack triggered with damage " + attackDamage);
+
+        PlayerHealth3D health = player.GetComponent<PlayerHealth3D>();
+        if (health != null)
+        {
+            health.TakeDamage(attackDamage);
+        }
+        else
+        {
+            Log("Tried to attack but player has no PlayerHealth3D");
+        }
     }
+
 
     #endregion
 
