@@ -14,14 +14,21 @@ public class ObjectiveBall3D : MonoBehaviour
             Debug.Log("[ObjectiveBall3D] Player collected the ball");
         }
 
-        // Optional: clear alerts
         if (AlertBus3D.Instance != null)
         {
             AlertBus3D.Instance.ClearAllAlerts();
         }
 
-        // TODO for you: trigger win UI or load next scene
-        // For now just destroy the ball
+        if (AudioManager3D.Instance != null)
+        {
+            AudioManager3D.Instance.PlayObjectivePickup();
+        }
+
+        if (PlayerHealthUI3D.Instance != null)
+        {
+            PlayerHealthUI3D.Instance.ShowWin();
+        }
+
         Destroy(gameObject);
     }
 }

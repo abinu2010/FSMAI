@@ -76,10 +76,13 @@ public class ScentNode3D : MonoBehaviour
         }
 
         age += Time.deltaTime;
-        strength -= decayRate * Time.deltaTime;
 
-        // Cleanup conditions
-        if (strength <= 0f || age >= maxLifetime)
+        // Decay strength but don't let it go below a minimum (node still exists, just weak)
+        strength -= decayRate * Time.deltaTime;
+        strength = Mathf.Max(strength, 0.05f); // Keep minimum detectability until lifetime expires
+
+        // Only expire based on lifetime, NOT strength
+        if (age >= maxLifetime)
         {
             Debug.Log($"[ScentNode3D] Expired at {transform.position} (age={age:F1}s, remaining strength={strength:F2})");
             Destroy(gameObject);

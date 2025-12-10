@@ -42,6 +42,11 @@ public class PlayerHealth3D : MonoBehaviour
             Debug.Log("[PlayerHealth3D] Took damage " + amount + " current " + currentHealth);
         }
 
+        if (AudioManager3D.Instance != null)
+        {
+            AudioManager3D.Instance.PlayPlayerHurt();
+        }
+
         if (currentHealth <= 0f)
         {
             Die();
@@ -76,7 +81,11 @@ public class PlayerHealth3D : MonoBehaviour
             Debug.Log("[PlayerHealth3D] Player died");
         }
 
-        // Optional: stop player movement
+        if (AudioManager3D.Instance != null)
+        {
+            AudioManager3D.Instance.PlayPlayerDeath();
+        }
+
         var controller = GetComponent<PlayerController3D>();
         if (controller != null)
         {
@@ -89,13 +98,14 @@ public class PlayerHealth3D : MonoBehaviour
             look.enabled = false;
         }
 
-        // Optional: clear alerts when player dies
         if (AlertBus3D.Instance != null)
         {
             AlertBus3D.Instance.ClearAllAlerts();
         }
 
-        // TODO for you: trigger game over UI or reload scene
-        // For now just log so you see something in console
+        if (PlayerHealthUI3D.Instance != null)
+        {
+            PlayerHealthUI3D.Instance.ShowLose();
+        }
     }
 }

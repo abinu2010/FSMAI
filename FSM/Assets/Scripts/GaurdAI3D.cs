@@ -1,69 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
 
-/*
-===========================================
-GUARD AI STATE MACHINE - DOCUMENTATION
-===========================================
-
-STATES:
--------
-PATROL      - Walking between patrol points. Calm. Looking for trouble.
-SUSPICIOUS  - Heard/smelled something. Stops and looks around for 2-3 seconds.
-INVESTIGATE - Going to check out a specific location (sound, smell, or alert).
-SEARCH      - Actively searching an area (circular pattern). High alertness.
-CHASE       - Pursuing the player. Running at full speed.
-ATTACK      - In combat with player. Dealing damage.
-
-SUSPICION LEVEL (0 to 3):
--------------------------
-0.0       - Calm, nothing wrong
-0.5       - Slightly alerted (heard distant sound)
-1.0       - Suspicious (heard close sound, weak smell)
-1.5       - Concerned (found evidence, strong smell)  
-2.0       - Alert (received alert from other guard)
-3.0       - THREAT CONFIRMED (saw player or received critical alert)
-
-ALERT LEVELS (sent to other guards):
-------------------------------------
-LOW      - "I heard something" -> Others become Suspicious
-MEDIUM   - "I found something" -> Others Investigate
-HIGH     - "I SEE THE INTRUDER" -> Others Search the area
-CRITICAL - "I'M ENGAGING!" -> Others come to Assist immediately
-
-STATE TRANSITIONS:
-------------------
-PATROL:
-  -> SUSPICIOUS: heard quiet sound, weak smell
-  -> INVESTIGATE: heard loud sound, strong smell, received LOW/MEDIUM alert
-  -> SEARCH: received HIGH alert
-  -> CHASE: saw player, received CRITICAL alert
-  
-SUSPICIOUS:
-  -> PATROL: nothing found after timeout
-  -> INVESTIGATE: suspicion increased
-  -> CHASE: saw player
-
-INVESTIGATE:
-  -> SUSPICIOUS: arrived, found nothing
-  -> SEARCH: arrived, found evidence (bait, strong smell)
-  -> CHASE: saw player
-
-SEARCH:
-  -> PATROL: search timeout, nothing found
-  -> CHASE: saw player
-
-CHASE:
-  -> ATTACK: close enough to player
-  -> SEARCH: lost sight of player
-
-ATTACK:
-  -> CHASE: player moved out of range
-  -> SEARCH: player escaped completely
-
-===========================================
-*/
-
 public enum GuardState
 {
     Patrol,
@@ -154,7 +91,10 @@ public class GuardAI3D : MonoBehaviour
     // Flags
     bool subscribedToEvents = false;
     bool foundEvidence = false;
-
+    public string DebugStateName
+    {
+        get { return currentState.ToString(); }
+    }
     #region Unity Lifecycle
 
     void Awake()
@@ -315,7 +255,15 @@ public class GuardAI3D : MonoBehaviour
 
     void UpdatePatrol()
     {
-        // Wait at patrol point
+        if (AlertBus3D.Instance != null &&
+            AlertBus3D.Instance.CurrentGlobalAlert >= AlertLevel.High)
+        {
+            investigatePosition = AlertBus3D.Instance.LastKnownPlayerPosition;
+            Log("Global alert high, switching from patrol to search");
+            EnterState(GuardState.Search);
+            return;
+        }
+
         if (agent.remainingDistance <= agent.stoppingDistance)
         {
             patrolWaitTimer += Time.deltaTime;
@@ -326,6 +274,7 @@ public class GuardAI3D : MonoBehaviour
             }
         }
     }
+
 
     void GoToNextPatrolPoint()
     {
@@ -421,20 +370,30 @@ public class GuardAI3D : MonoBehaviour
 
     void UpdateSearch()
     {
-        // Check if arrived at search point
         if (!agent.pathPending && agent.remainingDistance <= 1.5f)
         {
             GoToNextSearchPoint();
         }
 
-        // Timeout
         if (stateTimer >= searchDuration)
         {
-            Log("Search complete, returning to patrol");
-            suspicionLevel = Mathf.Max(0, suspicionLevel - 1f);
-            EnterState(GuardState.Patrol);
+            bool combatOngoing = AlertBus3D.Instance != null &&
+                                 AlertBus3D.Instance.CurrentGlobalAlert >= AlertLevel.High;
+
+            if (!combatOngoing)
+            {
+                Log("Search complete, returning to patrol");
+                suspicionLevel = Mathf.Max(0, suspicionLevel - 1f);
+                EnterState(GuardState.Patrol);
+            }
+            else
+            {
+                stateTimer = 0f;
+                Log("Search extended because global alert is high");
+            }
         }
     }
+
 
     void GoToNextSearchPoint()
     {
