@@ -1,48 +1,29 @@
-using System.Diagnostics;
+using System;
 using TMPro;
 using UnityEngine;
 
-public class GuardStatusHUD : MonoBehaviour
+public class GaurdStatusHUD : MonoBehaviour
 {
-    [System.Serializable]
+    [Serializable]
     public class GuardEntry
     {
         public string guardId;
-        public GaurdAI3D guard;
+        public GuardAI3D guard;
         public TextMeshProUGUI label;
     }
 
     public GuardEntry[] entries;
+
     public Color defaultColor = Color.white;
     public Color patrolColor = Color.cyan;
+    public Color suspicionColor = Color.magenta;
+    public Color inspectColor = Color.green;
     public Color chaseColor = Color.yellow;
     public Color attackColor = Color.red;
 
     void Awake()
     {
-        Debug.Log("[GuardStatusHUD3D] Awake, entries count=" + (entries == null ? 0 : entries.Length));
-    }
-
-    void OnEnable()
-    {
-        if (entries == null)
-        {
-            Debug.LogWarning("[GuardStatusHUD3D] Entries array is null.");
-            return;
-        }
-
-        for (int i = 0; i < entries.Length; i++)
-        {
-            var e = entries[i];
-            if (e.guard == null)
-            {
-                Debug.LogWarning("[GuardStatusHUD3D] Missing guard reference at index " + i);
-            }
-            if (e.label == null)
-            {
-                Debug.LogWarning("[GuardStatusHUD3D] Missing label reference at index " + i);
-            }
-        }
+        Debug.Log("[GaurdStatusHUD] Awake entries=" + (entries == null ? 0 : entries.Length));
     }
 
     void Update()
@@ -52,7 +33,7 @@ public class GuardStatusHUD : MonoBehaviour
         for (int i = 0; i < entries.Length; i++)
         {
             var e = entries[i];
-            if (e.guard == null || e.label == null) continue;
+            if (e == null || e.guard == null || e.label == null) continue;
 
             string stateName = e.guard.DebugStateName;
             e.label.text = e.guardId + "  " + stateName;
@@ -62,17 +43,15 @@ public class GuardStatusHUD : MonoBehaviour
 
     Color GetColorForState(string stateName)
     {
-        if (string.IsNullOrEmpty(stateName))
-            return defaultColor;
+        if (string.IsNullOrEmpty(stateName)) return defaultColor;
 
-        if (stateName.Contains("Patrol"))
-            return patrolColor;
+        string lower = stateName.ToLowerInvariant();
 
-        if (stateName.Contains("Chase"))
-            return chaseColor;
-
-        if (stateName.Contains("Attack"))
-            return attackColor;
+        if (lower.Contains("patrol")) return patrolColor;
+        if (lower.Contains("susp")) return suspicionColor;
+        if (lower.Contains("inspect") || lower.Contains("invest")) return inspectColor;
+        if (lower.Contains("chase") || lower.Contains("pursue")) return chaseColor;
+        if (lower.Contains("attack")) return attackColor;
 
         return defaultColor;
     }
