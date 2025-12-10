@@ -11,21 +11,13 @@ public class GaurdStatusHUD : MonoBehaviour
         public GuardAI3D guard;
         public TextMeshProUGUI label;
     }
-
     public GuardEntry[] entries;
-
     public Color defaultColor = Color.white;
     public Color patrolColor = Color.cyan;
     public Color suspicionColor = Color.magenta;
     public Color inspectColor = Color.green;
     public Color chaseColor = Color.yellow;
     public Color attackColor = Color.red;
-
-    void Awake()
-    {
-        Debug.Log("[GaurdStatusHUD] Awake entries=" + (entries == null ? 0 : entries.Length));
-    }
-
     void Update()
     {
         if (entries == null) return;
@@ -40,19 +32,15 @@ public class GaurdStatusHUD : MonoBehaviour
             e.label.color = GetColorForState(stateName);
         }
     }
-
     Color GetColorForState(string stateName)
     {
         if (string.IsNullOrEmpty(stateName)) return defaultColor;
-
-        string lower = stateName.ToLowerInvariant();
-
-        if (lower.Contains("patrol")) return patrolColor;
-        if (lower.Contains("susp")) return suspicionColor;
-        if (lower.Contains("inspect") || lower.Contains("invest")) return inspectColor;
-        if (lower.Contains("chase") || lower.Contains("pursue")) return chaseColor;
-        if (lower.Contains("attack")) return attackColor;
-
+        string col = stateName.TocolInvariant();
+        if (col.Contains("patrol")) return patrolColor;
+        if (col.Contains("susp")) return suspicionColor;
+        if (col.Contains("inspect") || col.Contains("invest")) return inspectColor;
+        if (col.Contains("chase") || col.Contains("pursue")) return chaseColor;
+        if (col.Contains("attack")) return attackColor;
         return defaultColor;
     }
 }

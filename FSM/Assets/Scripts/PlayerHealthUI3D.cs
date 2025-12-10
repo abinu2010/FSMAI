@@ -9,11 +9,8 @@ public class PlayerHealthUI3D : MonoBehaviour
     public TMP_Text healthText;
     public GameObject losePanel;
     public GameObject winPanel;
-
     static PlayerHealthUI3D instance;
-
     public static PlayerHealthUI3D Instance => instance;
-
     void Awake()
     {
         if (instance != null && instance != this)
@@ -21,10 +18,8 @@ public class PlayerHealthUI3D : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
         instance = this;
     }
-
     void Start()
     {
         if (playerHealth == null)
@@ -35,26 +30,21 @@ public class PlayerHealthUI3D : MonoBehaviour
                 playerHealth = playerObj.GetComponent<PlayerHealth3D>();
             }
         }
-
         if (playerHealth != null && healthSlider != null)
         {
             healthSlider.maxValue = playerHealth.CurrentHealth;
             healthSlider.value = playerHealth.CurrentHealth;
         }
-
         if (losePanel != null)
         {
             losePanel.SetActive(false);
         }
-
         if (winPanel != null)
         {
             winPanel.SetActive(false);
         }
-
         UpdateHealthText();
     }
-
     void Update()
     {
         if (playerHealth == null) return;
@@ -63,10 +53,8 @@ public class PlayerHealthUI3D : MonoBehaviour
         {
             healthSlider.value = playerHealth.CurrentHealth;
         }
-
         UpdateHealthText();
     }
-
     void UpdateHealthText()
     {
         if (healthText == null || playerHealth == null) return;
@@ -74,7 +62,6 @@ public class PlayerHealthUI3D : MonoBehaviour
         int hp = Mathf.CeilToInt(playerHealth.CurrentHealth);
         healthText.text = "HP " + hp;
     }
-
     public void ShowLose()
     {
         if (losePanel != null)
@@ -89,19 +76,16 @@ public class PlayerHealthUI3D : MonoBehaviour
 
         Time.timeScale = 0f;
     }
-
     public void ShowWin()
     {
         if (winPanel != null)
         {
             winPanel.SetActive(true);
         }
-
         if (losePanel != null)
         {
             losePanel.SetActive(false);
         }
-
         Time.timeScale = 0f;
     }
 }

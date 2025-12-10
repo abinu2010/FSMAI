@@ -3,25 +3,17 @@ using UnityEngine;
 
 public class ScentNode3D : MonoBehaviour
 {
-    // Static list of all active scent nodes
     public static readonly List<ScentNode3D> AllNodes = new List<ScentNode3D>();
-
     [Header("Scent Properties")]
     public float strength = 1f;
-    public float decayRate = 0.025f; // Slow decay - lasts ~40 seconds at strength 1.0
+    public float decayRate = 0.025f; // Slow decay lasts seconds at strength 1.0
     public float maxLifetime = 60f; // Max lifetime in seconds
-
     [Header("Visual Debug")]
     public bool showDebugSphere = true;
     public Color debugColor = new Color(0.2f, 1f, 0.2f, 0.4f);
-
     float age = 0f;
     float initialStrength;
     bool initialized = false;
-
-    /// <summary>
-    /// Initialize the scent node with specific values. Call this right after Instantiate!
-    /// </summary>
     public void Initialize(float newStrength, float newDecayRate, float newMaxLifetime = 60f)
     {
         strength = newStrength;
@@ -30,118 +22,78 @@ public class ScentNode3D : MonoBehaviour
         initialStrength = newStrength;
         age = 0f;
         initialized = true;
-
-        Debug.Log($"[ScentNode3D] Initialized at {transform.position} strength={strength:F2} decay={decayRate} lifetime={maxLifetime}");
     }
-
     void Awake()
     {
-        // Only set initialStrength here if not initialized via Initialize()
         if (!initialized)
         {
             initialStrength = strength;
         }
     }
-
     void OnEnable()
     {
-        // Register this node
         if (!AllNodes.Contains(this))
         {
             AllNodes.Add(this);
         }
-        // Don't log here - wait for Initialize or first Update
     }
-
     void OnDisable()
     {
         AllNodes.Remove(this);
         Debug.Log($"[ScentNode3D] Removed (Remaining nodes: {AllNodes.Count})");
     }
-
     void OnDestroy()
     {
-        // Ensure removal on destroy
         AllNodes.Remove(this);
     }
-
     void Update()
     {
-        // Log registration on first update if not initialized
         if (!initialized)
         {
             initialized = true;
             initialStrength = strength;
             Debug.Log($"[ScentNode3D] REGISTERED at {transform.position} strength={strength:F2} decay={decayRate} (Total nodes: {AllNodes.Count})");
         }
-
         age += Time.deltaTime;
-
-        // Decay strength but don't let it go below a minimum (node still exists, just weak)
         strength -= decayRate * Time.deltaTime;
         strength = Mathf.Max(strength, 0.05f); // Keep minimum detectability until lifetime expires
-
-        // Only expire based on lifetime, NOT strength
         if (age >= maxLifetime)
         {
             Debug.Log($"[ScentNode3D] Expired at {transform.position} (age={age:F1}s, remaining strength={strength:F2})");
             Destroy(gameObject);
         }
     }
-
-    /// <summary>
-    /// Get the effective strength at a given position (strength falls off with distance)
-    /// </summary>
     public float GetStrengthAtPosition(Vector3 position)
     {
         float distance = Vector3.Distance(transform.position, position);
-        // Strength falls off with distance squared for more realistic behavior
         return strength / (1f + distance * distance * 0.1f);
     }
-
-    /// <summary>
-    /// Boost the scent strength (e.g., when more scent is added at same location)
-    /// </summary>
     public void AddStrength(float amount)
     {
         strength += amount;
         Debug.Log($"[ScentNode3D] Strength boosted to {strength:F2}");
     }
-
     void OnDrawGizmos()
     {
         if (!showDebugSphere || !Application.isPlaying) return;
-
-        // Color intensity based on current strength relative to initial
         float ratio = Mathf.Clamp01(strength / Mathf.Max(initialStrength, 0.1f));
         Color col = debugColor;
         col.a = ratio * 0.5f;
         Gizmos.color = col;
-
-        // Size based on strength
         float size = 0.2f + (strength * 0.3f);
         Gizmos.DrawSphere(transform.position, size);
-
-        // Outer wire to show detection range
         Gizmos.color = new Color(col.r, col.g, col.b, 0.2f);
         Gizmos.DrawWireSphere(transform.position, size * 2f);
     }
-
-    /// <summary>
-    /// Find the strongest scent node near a position
-    /// </summary>
     public static ScentNode3D FindStrongestNear(Vector3 position, float maxDistance)
     {
         ScentNode3D strongest = null;
         float bestScore = 0f;
-
         foreach (var node in AllNodes)
         {
             if (node == null) continue;
-
             float dist = Vector3.Distance(position, node.transform.position);
             if (dist > maxDistance) continue;
-
             float score = node.strength / (1f + dist);
             if (score > bestScore)
             {
@@ -149,13 +101,8 @@ public class ScentNode3D : MonoBehaviour
                 strongest = node;
             }
         }
-
         return strongest;
     }
-
-    /// <summary>
-    /// Get total scent strength at a position from all nodes
-    /// </summary>
     public static float GetTotalStrengthAt(Vector3 position, float maxDistance)
     {
         float total = 0f;

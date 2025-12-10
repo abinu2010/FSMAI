@@ -4,41 +4,30 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class Bait3D : MonoBehaviour
 {
-    [Header("Sound Settings")]
     public float soundRadius = 12f;
     public float soundIntensity = 1.5f;
     public float landingSoundDelay = 0.1f;
-
-    [Header("Smell Settings")]
     public float smellStrength = 2f;
     public ScentNode3D scentNodePrefab;
-
-    [Header("Lifetime")]
     public float lifetime = 30f;
     public float activationDelay = 0.2f;
     public float groundCheckDelay = 0.5f;
-
-    [Header("Debug")]
     public bool showDebugRadius = true;
     public bool showDebugLogs = true;
-
     bool activated;
     float spawnTime;
     Rigidbody rb;
     bool hasLoggedMissingScentPrefab;
-
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         spawnTime = Time.time;
-
         if (rb != null)
         {
             rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.useGravity = true;
         }
-
         Collider col = GetComponent<Collider>();
         if (col == null)
         {
@@ -47,29 +36,20 @@ public class Bait3D : MonoBehaviour
             col = sphere;
         }
         col.isTrigger = false;
-
         int playerLayer = LayerMask.NameToLayer("Player");
         if (playerLayer >= 0)
         {
             Physics.IgnoreLayerCollision(gameObject.layer, playerLayer, true);
         }
-
-        if (showDebugLogs)
-        {
-            Debug.Log($"[Bait3D] Spawned at {transform.position}, rb={rb != null}");
-        }
     }
-
     void Start()
     {
         InvokeRepeating(nameof(CheckIfGrounded), groundCheckDelay, 0.2f);
     }
-
     void Update()
     {
         if (Time.time - spawnTime > lifetime)
         {
-            if (showDebugLogs) Debug.Log("[Bait3D] Lifetime over, destroying");
             Destroy(gameObject);
             return;
         }
@@ -78,27 +58,22 @@ public class Bait3D : MonoBehaviour
         {
             if (rb.linearVelocity.magnitude < 0.1f)
             {
-                if (showDebugLogs) Debug.Log("[Bait3D] Velocity near zero, activating");
                 ActivateBait("velocity stopped");
             }
         }
     }
-
     void CheckIfGrounded()
     {
         if (activated) return;
         if (Time.time - spawnTime < activationDelay) return;
-
         if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, 0.3f))
         {
             if (!hit.collider.CompareTag("Player"))
             {
-                if (showDebugLogs) Debug.Log($"[Bait3D] Grounded via raycast on {hit.collider.name}");
                 ActivateBait($"raycast hit {hit.collider.name}");
             }
         }
     }
-
     void OnCollisionEnter(Collision collision)
     {
         if (showDebugLogs)
@@ -106,59 +81,36 @@ public class Bait3D : MonoBehaviour
             Debug.Log($"[Bait3D] OnCollisionEnter with {collision.gameObject.name} tag={collision.gameObject.tag}");
         }
 
-        if (activated) return;
-
-        if (collision.gameObject.CompareTag("Player"))
-        {
-            if (showDebugLogs) Debug.Log("[Bait3D] Collision with player ignored");
-            return;
-        }
-
-        if (collision.gameObject.CompareTag("Guard"))
-        {
-            if (showDebugLogs) Debug.Log("[Bait3D] Hit a guard collider");
-        }
-
         ActivateBait($"collision with {collision.gameObject.name}");
     }
-
     void OnTriggerEnter(Collider other)
     {
         if (showDebugLogs)
         {
             Debug.Log($"[Bait3D] OnTriggerEnter with {other.gameObject.name} tag={other.gameObject.tag}");
         }
-
         if (activated) return;
-
         if (other.CompareTag("Player"))
         {
             if (showDebugLogs) Debug.Log("[Bait3D] Trigger with player ignored");
             return;
         }
-
         if (other.CompareTag("Guard"))
         {
             if (showDebugLogs) Debug.Log("[Bait3D] Triggered by guard collider");
         }
-
         ActivateBait($"trigger with {other.gameObject.name}");
     }
-
     void ActivateBait(string reason)
     {
         if (activated) return;
         activated = true;
-
         CancelInvoke(nameof(CheckIfGrounded));
-
         Vector3 landPos = transform.position;
-
         if (showDebugLogs)
         {
             Debug.Log($"[Bait3D] Activated at {landPos} reason={reason}");
         }
-
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
@@ -166,11 +118,9 @@ public class Bait3D : MonoBehaviour
             rb.isKinematic = true;
             rb.constraints = RigidbodyConstraints.FreezeAll;
         }
-
         Invoke(nameof(EmitLandingSound), landingSoundDelay);
         CreateSmellNode();
     }
-
     void EmitLandingSound()
     {
         if (SoundBus3D.Instance != null)
@@ -186,7 +136,6 @@ public class Bait3D : MonoBehaviour
             Debug.LogWarning("[Bait3D] No SoundBus3D Instance");
         }
     }
-
     void CreateSmellNode()
     {
         if (scentNodePrefab != null)
@@ -207,7 +156,6 @@ public class Bait3D : MonoBehaviour
             }
         }
     }
-
     void OnDrawGizmos()
     {
         if (!showDebugRadius) return;

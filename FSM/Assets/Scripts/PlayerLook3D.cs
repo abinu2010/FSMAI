@@ -5,10 +5,8 @@ public class PlayerLook3D : MonoBehaviour
     public Transform cameraTransform;
     public float mouseSensitivity = 150f;
     public float maxPitch = 80f;
-
     float pitch;
     bool cursorLocked;
-
     void Awake()
     {
         if (cameraTransform == null)
@@ -19,11 +17,8 @@ public class PlayerLook3D : MonoBehaviour
                 cameraTransform = cam.transform;
             }
         }
-
         LockCursor(true);
-        Debug.Log("[PlayerLook3D] Ready");
     }
-
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape))
@@ -39,15 +34,12 @@ public class PlayerLook3D : MonoBehaviour
             }
             return;
         }
-
         float mouseX = Input.GetAxisRaw("Mouse X") * mouseSensitivity * Time.deltaTime;
         float mouseY = Input.GetAxisRaw("Mouse Y") * mouseSensitivity * Time.deltaTime;
-
         if (Mathf.Abs(mouseX) > 0.0001f)
         {
             transform.Rotate(Vector3.up * mouseX);
         }
-
         if (cameraTransform != null)
         {
             pitch -= mouseY;
@@ -55,12 +47,10 @@ public class PlayerLook3D : MonoBehaviour
             cameraTransform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
         }
     }
-
     void LockCursor(bool locked)
     {
         cursorLocked = locked;
         Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !locked;
-        Debug.Log("[PlayerLook3D] Cursor locked=" + locked);
     }
 }
