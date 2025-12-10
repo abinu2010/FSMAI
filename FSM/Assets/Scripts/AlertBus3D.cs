@@ -59,7 +59,6 @@ public class AlertBus3D : MonoBehaviour
         if (newLevel != CurrentGlobalAlert)
         {
             CurrentGlobalAlert = newLevel;
-            Debug.Log($"[AlertBus3D] Global alert changed to: {CurrentGlobalAlert} (value: {globalAlertValue:F2})");
         }
         recentAlerts.RemoveAll(a => Time.time - a.time > 3f);
     }
@@ -79,24 +78,15 @@ public class AlertBus3D : MonoBehaviour
         float alertIncrease = 0f;
         switch (level)
         {
-            case AlertLevel.Low:
-                alertIncrease = 0.5f;
-                break;
-            case AlertLevel.Medium:
-                alertIncrease = 1.5f;
-                break;
-            case AlertLevel.High:
-                alertIncrease = 2.5f;
-                break;
-            case AlertLevel.Critical:
-                alertIncrease = 4f;
-                break;
+            case AlertLevel.Low: alertIncrease = 0.5f;break;
+            case AlertLevel.Medium:alertIncrease = 1.5f;break;
+            case AlertLevel.High:alertIncrease = 2.5f;break;
+            case AlertLevel.Critical:alertIncrease = 4f;break;
         }
 
         globalAlertValue = Mathf.Min(globalAlertValue + alertIncrease, 5f);
 
         string guardName = sourceGuard != null ? sourceGuard.name : "Unknown";
-        Debug.Log($"[AlertBus3D] ALERT RAISED by {guardName} at {position} - Level: {level} (Global: {globalAlertValue:F2})");
         if (showAlertGizmos)
         {
             recentAlerts.Add(new AlertGizmoData
@@ -111,10 +101,6 @@ public class AlertBus3D : MonoBehaviour
         {
             int listenerCount = handler.GetInvocationList().Length;
             handler(position, sourceGuard, level);
-        }
-        else
-        {
-            Debug.LogWarning("[AlertBus3D] No listeners subscribed to OnAlertRaised!");
         }
     }
     public int GetListenerCount()

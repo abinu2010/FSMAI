@@ -148,30 +148,25 @@ public class GuardAI3D : MonoBehaviour
         if (stateBillboard != null) stateBillboard.SetText(currentState.ToString());
         switch (newState)
         {
-            case GuardState.Patrol:
-                agent.speed = patrolSpeed;
+            case GuardState.Patrol:agent.speed = patrolSpeed;
                 foundEvidence = false;
                 GoToNextPatrolPoint();
                 break;
-            case GuardState.Suspicious:
-                agent.speed = 0f;
+            case GuardState.Suspicious:agent.speed = 0f;
                 agent.isStopped = true;
                 break;
-            case GuardState.Investigate:
-                agent.speed = investigateSpeed;
+            case GuardState.Investigate:agent.speed = investigateSpeed;
                 agent.isStopped = false;
                 agent.SetDestination(investigatePosition);
                 break;
-            case GuardState.Search:
-                agent.speed = investigateSpeed;
+            case GuardState.Search:agent.speed = investigateSpeed;
                 agent.isStopped = false;
                 searchCenter = investigatePosition;
                 searchPointIndex = 0;
                 GoToNextSearchPoint();
                 RaiseAlert(AlertLevel.High);
                 break;
-            case GuardState.Chase:
-                agent.speed = chaseSpeed;
+            case GuardState.Chase:agent.speed = chaseSpeed;
                 agent.isStopped = false;
                 suspicionLevel = 3f; // Confirmed threat
                 RaiseAlert(AlertLevel.High);
