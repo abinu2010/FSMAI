@@ -21,7 +21,6 @@ public class ScentTrail3D : MonoBehaviour
     private PlayerController3D playerController;
     private Vector3[] recentPositions;
     private int positionIndex;
-    private bool hasLoggedMissingPrefab = false;
     private int totalNodesSpawned = 0;
     void Awake()
     {

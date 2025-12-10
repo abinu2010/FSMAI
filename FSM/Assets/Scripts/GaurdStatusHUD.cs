@@ -35,12 +35,12 @@ public class GaurdStatusHUD : MonoBehaviour
     Color GetColorForState(string stateName)
     {
         if (string.IsNullOrEmpty(stateName)) return defaultColor;
-        string col = stateName.TocolInvariant();
-        if (col.Contains("patrol")) return patrolColor;
-        if (col.Contains("susp")) return suspicionColor;
-        if (col.Contains("inspect") || col.Contains("invest")) return inspectColor;
-        if (col.Contains("chase") || col.Contains("pursue")) return chaseColor;
-        if (col.Contains("attack")) return attackColor;
+        string low = stateName.ToLowerInvariant();
+        if (low.Contains("patrol")) return patrolColor;
+        if (low.Contains("susp")) return suspicionColor;
+        if (low.Contains("inspect") || low.Contains("invest")) return inspectColor;
+        if (low.Contains("chase") || low.Contains("pursue")) return chaseColor;
+        if (low.Contains("attack")) return attackColor;
         return defaultColor;
     }
 }

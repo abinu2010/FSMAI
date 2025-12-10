@@ -1384,7 +1384,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 16592f253133e4243bfa3336bb7f8d62, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  logEvents: 1
 --- !u!135 &629410987
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -1678,7 +1677,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sfxSource: {fileID: 677981585}
-  objectivePickupClip: {fileID: 8300000, guid: 15fc2a3d740f07442bc1a8e11c53c9ae, type: 3}
+  objectPickupClip: {fileID: 0}
   playerHurtClip: {fileID: 8300000, guid: 372f86593e7e842409a3167e6b166902, type: 3}
   playerDeathClip: {fileID: 8300000, guid: 86c8e965111283d488b33a8a6aeb5fd9, type: 3}
 --- !u!4 &677981587
@@ -4900,7 +4899,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 100
-  logEvents: 1
 --- !u!82 &1470940929
 AudioSource:
   m_ObjectHideFlags: 0
@@ -6288,7 +6286,6 @@ GameObject:
   - component: {fileID: 1803185626}
   - component: {fileID: 1803185625}
   - component: {fileID: 1803185624}
-  - component: {fileID: 1803185627}
   m_Layer: 0
   m_Name: Sys
   m_TagString: Untagged
@@ -6339,21 +6336,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1803185627
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1803185623}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2e71976c6f2f8f94f90ab493135124e6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  soundBusPrefab: {fileID: 1803185624}
-  alertBusPrefab: {fileID: 1803185625}
-  showDebugInfo: 1
 --- !u!1 &1811212962
 GameObject:
   m_ObjectHideFlags: 0
