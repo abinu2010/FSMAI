@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class PlayerHealthUI3D : MonoBehaviour
 {
@@ -44,6 +45,7 @@ public class PlayerHealthUI3D : MonoBehaviour
             winPanel.SetActive(false);
         }
         UpdateHealthText();
+        SetCursorLocked(true);
     }
     void Update()
     {
@@ -58,9 +60,13 @@ public class PlayerHealthUI3D : MonoBehaviour
     void UpdateHealthText()
     {
         if (healthText == null || playerHealth == null) return;
-
         int hp = Mathf.CeilToInt(playerHealth.CurrentHealth);
         healthText.text = "HP " + hp;
+    }
+    void SetCursorLocked(bool locked)
+    {
+        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+        Cursor.visible = !locked;
     }
     public void ShowLose()
     {
@@ -68,13 +74,12 @@ public class PlayerHealthUI3D : MonoBehaviour
         {
             losePanel.SetActive(true);
         }
-
         if (winPanel != null)
         {
             winPanel.SetActive(false);
         }
-
         Time.timeScale = 0f;
+        SetCursorLocked(false);
     }
     public void ShowWin()
     {
@@ -87,5 +92,21 @@ public class PlayerHealthUI3D : MonoBehaviour
             losePanel.SetActive(false);
         }
         Time.timeScale = 0f;
+        SetCursorLocked(false);
+    }
+    public void OnRestartClicked()
+    {
+        Time.timeScale = 1f;
+        SetCursorLocked(true);
+        Scene scene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(scene.buildIndex);
+    }
+    public void OnQuitClicked()
+    {
+        Time.timeScale = 1f;
+        Application.Quit();
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#endif
     }
 }

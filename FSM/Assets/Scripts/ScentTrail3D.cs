@@ -100,7 +100,7 @@ public class ScentTrail3D : MonoBehaviour
         positionIndex++;
         if (showDebugLogs)
         {
-            Debug.Log($"[ScentTrail3D] Node #{totalNodesSpawned} at {transform.position} strength={strength:F2} decay={decay}");
+            Debug.Log($"ScentTrail3D Node #{totalNodesSpawned} at {transform.position} strength={strength:F2} decay={decay}");
         }
         lastSpawnPos = transform.position;
         timeSinceLastSpawn = 0f;
